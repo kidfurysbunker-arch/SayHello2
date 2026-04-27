@@ -42,15 +42,49 @@ jobs:
         run: |
           rm -rf ios
           npx cap add ios
+          
+          # Add NFC Permissions to Info.plist
           PLIST="ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
             /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'TracePro requires NFC access to scan RFID/NFC tags.'" "$PLIST" || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats array" "$PLIST" || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats:0 string NDEF" "$PLIST" || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats:1 string TAG" "$PLIST" || true
           fi
+
+          # Create Entitlements
+          ENTITLEMENTS="ios/App/App/App.entitlements"
+          echo '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.developer.nfc.readersession.formats</key>
+            <array>
+              <string>NDEF</string>
+              <string>TAG</string>
+            </array>
+          </dict>
+          </plist>' > "$ENTITLEMENTS"
+
+          # Sync
           npx cap sync ios
+
+          # Patch Podfile to ensure CoreNFC linkage and specific builds
+          PODFILE="ios/App/Podfile"
+          echo "post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+                config.build_settings['ENABLE_BITCODE'] = 'NO'
+              end
+            end
+          end" >> "$PODFILE"
+
           cd ios/App && pod install --repo-update && cd ../..
 
       - name: Build Xcode Project
         run: |
+          # Use xcodebuild to build and archive without signing
           xcodebuild archive \
                      -workspace ios/App/App.xcworkspace \
                      -scheme App \
@@ -62,18 +96,21 @@ jobs:
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
                      AD_HOC_CODE_SIGNING_ALLOWED=YES \
+                     DEVELOPMENT_TEAM="" \
+                     CODE_SIGN_STYLE=Manual \
                      ENABLE_USER_SCRIPT_SANDBOXING=NO \
                      COMPILER_INDEX_STORE_ENABLE=NO \
                      IPHONEOS_DEPLOYMENT_TARGET=14.0 \
                      GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-                     -allowProvisioningUpdates \
                      -quiet
 
       - name: Export IPA
         run: |
+          # Manual IPA creation since we can't use exportArchive without profiles
           mkdir -p build/Payload
           APP_PATH=$(find App.xcarchive -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
+            echo "Error: .app bundle not found in archive"
             exit 1
           fi
           cp -R "$APP_PATH" build/Payload
