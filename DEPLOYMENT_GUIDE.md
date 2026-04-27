@@ -3,10 +3,10 @@
 ## 1. Prepare your GitHub Repository
 1. Create a **new** GitHub repository.
 2. **Download the project** from AI Studio.
-3. **IMPORTANT: DO NOT UPLOAD `node_modules`**
+3. **IMPORTANT: DELETE THESE FOLDERS BEFORE UPLOADING**
    - On your PC, open the folder you downloaded.
-   - Look for a folder named `node_modules` and **DELETE it**.
-   - This folder is huge and is the reason GitHub says the file is too big. GitHub will install these files automatically during the build.
+   - **Delete these folders:** `node_modules`, `ios`, `android`.
+   - These folders are either too large or can interfere with the build. My build script will recreate them automatically and correctly.
 4. **Unzip** everything else and upload all other files/folders to your GitHub repo.
    - If you have many files, use the [GitHub Desktop](https://desktop.github.com/) app.
 

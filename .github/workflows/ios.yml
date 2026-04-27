@@ -51,12 +51,10 @@ jobs:
 
       - name: Capacitor Setup
         run: |
-          if [ ! -d "ios" ]; then
-            echo "Adding iOS platform..."
-            npx cap add ios
-          else
-            echo "iOS platform already found in repository."
-          fi
+          # Clean up any existing ios folder to ensure a fresh build
+          rm -rf ios
+          echo "Adding fresh iOS platform..."
+          npx cap add ios
           npx cap sync ios
 
       - name: Debug iOS Structure
@@ -82,7 +80,12 @@ jobs:
       - name: Export IPA
         run: |
           mkdir -p build/Payload
-          cp -R App.xcarchive/Products/Applications/App.app build/Payload
+          APP_PATH=$(find App.xcarchive -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app file not found in archive!"
+            exit 1
+          fi
+          cp -R "$APP_PATH" build/Payload
           cd build && zip -r TracePro.ipa Payload
 
       - name: Upload Artifact
