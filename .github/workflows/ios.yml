@@ -51,22 +51,26 @@ jobs:
 
       - name: Capacitor Setup
         run: |
-          # Clean up any existing ios folder to ensure a fresh build
+          # 1. Clean up and re-add
           rm -rf ios
           echo "Adding fresh iOS platform..."
           npx cap add ios
-          npx cap sync ios
-
-      - name: Debug iOS Structure
-        run: |
-          ls -R ios || echo "ios directory not found"
+          
+          # 2. Sync (Verbose)
+          echo "Syncing web assets to native..."
+          npx cap sync ios --verbose
+          
+          # 3. Check if build succeeded
+          if [ -d "ios/App/App.xcworkspace" ]; then
+            echo "SUCCESS: ios/App/App.xcworkspace exists."
+          else
+            echo "ERROR: ios/App/App.xcworkspace was not created."
+            ls -R ios || echo "ios folder is missing"
+            exit 1
+          fi
 
       - name: Build Xcode Project
         run: |
-          if [ ! -f "ios/App/App.xcworkspace" ]; then
-            echo "Error: ios/App/App.xcworkspace not found! Capacitor sync might have failed."
-            exit 1
-          fi
           xcodebuild -workspace ios/App/App.xcworkspace \
                      -scheme App \
                      -configuration Debug \
