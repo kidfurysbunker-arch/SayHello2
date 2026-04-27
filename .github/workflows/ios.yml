@@ -69,22 +69,33 @@ jobs:
           # Sync
           npx cap sync ios
 
-          # Patch Podfile to ensure CoreNFC linkage and specific builds
+          # Patch Podfile safely to avoid duplicate post_install hooks
           PODFILE="ios/App/Podfile"
-          echo "post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-                config.build_settings['ENABLE_BITCODE'] = 'NO'
-              end
-            end
-          end" >> "$PODFILE"
+          if grep -q "post_install do |installer|" "$PODFILE"; then
+            # Insert our logic into the existing post_install block
+            sed -i '' '/post_install do |installer|/a \
+    installer.pods_project.targets.each do |target| \
+      target.build_configurations.each do |config| \
+        config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "14.0" \
+        config.build_settings["ENABLE_BITCODE"] = "NO" \
+      end \
+    end' "$PODFILE"
+          else
+            # Create a new post_install block if one doesn't exist
+            echo "post_install do |installer|
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+      end
+    end
+  end" >> "$PODFILE"
+          fi
 
           cd ios/App && pod install --repo-update && cd ../..
 
       - name: Build Xcode Project
         run: |
-          # Use xcodebuild to build and archive without signing
           xcodebuild archive \
                      -workspace ios/App/App.xcworkspace \
                      -scheme App \
@@ -106,7 +117,6 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Manual IPA creation since we can't use exportArchive without profiles
           mkdir -p build/Payload
           APP_PATH=$(find App.xcarchive -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
