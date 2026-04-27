@@ -24,7 +24,7 @@ jobs:
           fi
           PKG_PATH=$(find . -name package.json -not -path "*/node_modules/*" | head -n 1)
           if [ -z "$PKG_PATH" ]; then
-            echo "Error: package.json not found"
+            echo "Error: could not find package.json"
             exit 1
           fi
           PKG_DIR=$(dirname "$PKG_PATH")
@@ -36,27 +36,42 @@ jobs:
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Create .env file
+        run: |
+          # Create a placeholder .env so the build doesn't fail on missing env vars
+          touch .env
+          touch .env.local
+          # If GEMINI_API_KEY secret is set, use it; otherwise use a placeholder
+          if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env.local
+          else
+            echo "GEMINI_API_KEY=placeholder_key_for_build" > .env.local
+          fi
+
       - name: Build Web App
         run: npm run build
 
       - name: Capacitor Setup
         run: |
+          set -e
+          PROJECT_ROOT=$(pwd)
           rm -rf ios
           npx cap add ios
           npx cap sync ios
-          
-          PLIST="ios/App/App/Info.plist"
+
+          # 1. Update Info.plist for NFC permissions
+          PLIST="$PROJECT_ROOT/ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
-            /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'TracePro requires NFC access to scan RFID/NFC tags.'" "$PLIST" || true
-            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats array" "$PLIST" || true
-            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats:0 string NDEF" "$PLIST" || true
-            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats:1 string TAG" "$PLIST" || true
+            /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'This app requires NFC access to scan tags.'" "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Set :NFCReaderUsageDescription 'This app requires NFC access to scan tags.'" "$PLIST" || true
           fi
 
-          cat <<EOF > ios/App/App/App.entitlements
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
+          # 2. Create Entitlements file (using python to avoid YAML heredoc issues)
+          ENTITLEMENTS="$PROJECT_ROOT/ios/App/App/App.entitlements"
+          python3 -c "
+          content = '''<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+          <plist version=\"1.0\">
           <dict>
             <key>com.apple.developer.nfc.readersession.formats</key>
             <array>
@@ -65,13 +80,19 @@ jobs:
             </array>
           </dict>
           </plist>
-          EOF
+          '''
+          with open('$ENTITLEMENTS', 'w') as f:
+              f.write(content.strip())
+          "
 
-          cat <<EOF > ios/App/Podfile
-          require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+          # 3. Rewrite Podfile with correct deployment target
+          PODFILE="$PROJECT_ROOT/ios/App/Podfile"
+          HELPERS_PATH="$PROJECT_ROOT/node_modules/@capacitor/ios/scripts/pods_helpers.rb"
+          python3 -c "
+          helpers = '$HELPERS_PATH'
+          content = f'''require '{helpers}'
 
           platform :ios, '14.0'
-          use_frameworks!
 
           target 'App' do
             capacitor_pods
@@ -86,42 +107,69 @@ jobs:
               end
             end
           end
-          EOF
+          '''
+          with open('$PODFILE', 'w') as f:
+              f.write(content)
+          "
 
-          cd ios/App && pod install --repo-update && cd ../..
+          # 4. Install Pods
+          cd "$PROJECT_ROOT/ios/App"
+          pod install --repo-update
 
       - name: Build Xcode Project
         run: |
+          set -o pipefail
           xcodebuild archive \
-                     -workspace ios/App/App.xcworkspace \
-                     -scheme App \
-                     -configuration Debug \
-                     -destination 'generic/platform=iOS' \
-                     -archivePath App.xcarchive \
-                     CODE_SIGNING_ALLOWED=NO \
-                     CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGN_IDENTITY="" \
-                     PROVISIONING_PROFILE_SPECIFIER="" \
-                     AD_HOC_CODE_SIGNING_ALLOWED=YES \
-                     ENABLE_USER_SCRIPT_SANDBOXING=NO \
-                     COMPILER_INDEX_STORE_ENABLE=NO \
-                     IPHONEOS_DEPLOYMENT_TARGET=14.0 \
-                     GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-                     -quiet
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$GITHUB_WORKSPACE/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=14.0 \
+            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
+            2>&1 | tee xcodebuild.log | grep -E "^(error:|warning:|Build succeeded|Archive succeeded|FAILED|note:)" || true
+          # Check the exit code of xcodebuild (not grep)
+          if ! grep -q "ARCHIVE SUCCEEDED\|Archive succeeded\|BUILD SUCCEEDED\|Build succeeded" xcodebuild.log; then
+            echo "=== XCODEBUILD FAILED. Last 50 lines of log: ==="
+            tail -50 xcodebuild.log
+            exit 1
+          fi
 
       - name: Export IPA
         run: |
+          set -e
           mkdir -p build/Payload
           APP_PATH=$(find App.xcarchive -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "Error: .app bundle not found in archive"
+            ls -la App.xcarchive/ || true
             exit 1
           fi
-          cp -R "$APP_PATH" build/Payload
-          cd build && zip -r TracePro.ipa Payload
+          echo "Found app at: $APP_PATH"
+          cp -R "$APP_PATH" build/Payload/
+          cd build
+          zip -r TracePro.ipa Payload
+          echo "IPA created successfully!"
+          ls -lah TracePro.ipa
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TracePro-iOS-IPA
           path: build/TracePro.ipa
+          retention-days: 7
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          retention-days: 3
