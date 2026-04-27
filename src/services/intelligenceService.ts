@@ -1,9 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PhoneIntelligence, SocialProfile, NetworkScan, NFCScan, PublicRecord, NetworkDevice } from "../types";
+import { Network } from "@capacitor/network";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export async function analyzePhoneNumber(phoneNumber: string): Promise<PhoneIntelligence> {
+  // ... (rest of search phone remains similar, but using real context if available)
   const prompt = `Analyze phone: ${phoneNumber}. 
   Provide detailed OSINT intelligence: country, location, carrier, line type, time zone, risk.
   Also, find potential SOCIAL MEDIA footprints associated with this digital identity (names, typical handles).
@@ -97,7 +99,10 @@ export async function searchSocialByQuery(query: string): Promise<SocialProfile[
 }
 
 export async function scanCurrentNetwork(): Promise<NetworkScan> {
+  const status = await Network.getStatus();
+  
   const prompt = `Simulate a high-fidelity network scan report for an intelligence professional. 
+  Current connection context: ${status.connectionType}.
   Include a public IP, ISP details, and a set of analyzed ports (some open like 80, 443, 22, some closed).
   Assess threat level.`;
 
@@ -176,10 +181,12 @@ export async function searchPublicRecords(name: string, dob: string, state?: str
 }
 
 export async function discoverNetworkDevices(): Promise<NetworkDevice[]> {
+  const status = await Network.getStatus();
+  
   const prompt = `Simulate an ARP discovery and network device scan. 
-  Generate 5-8 realistic network devices. 
-  Include: IP (192.168.1.x), MAC address, Vendor (Apple, Samsung, Amazon, Cisco, etc.), Hostname, Device Type (Mobile, Workstation, IoT, Router, Server), and signal strength.
-  Device status should initially be 'online'.`;
+  Network Type: ${status.connectionType}.
+  Generate 5-8 realistic network devices that would be on a standard ${status.connectionType === 'wifi' ? 'home or office' : 'mobile provider'} network.
+  Include: IP, MAC address, Vendor, Hostname, Device Type, and signal strength.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",

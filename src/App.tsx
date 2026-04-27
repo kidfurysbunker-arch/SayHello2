@@ -162,15 +162,69 @@ export default function App() {
     setLoading(true);
     setView('nfc');
     setNfcData(null);
-    try {
-      // Simulation delay for "scanning"
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const data = await analyzeNfcTag();
-      setNfcData(data);
-    } catch (err) {
-      setError('NFC hardware failure or timeout.');
-    } finally {
-      setLoading(false);
+    setError(null);
+
+    // Check if running in a native environment with NFC support
+    const isNative = (window as any).nfc !== undefined;
+
+    if (isNative) {
+      try {
+        const nfc = (window as any).nfc;
+        
+        // On iOS, we need to begin the session
+        if ((window as any).device?.platform === 'iOS') {
+          nfc.beginSession(
+            () => console.log('NFC session started'),
+            (err: any) => setError(`NFC session failed: ${err}`)
+          );
+        }
+
+        // Add a listener for the next tag
+        nfc.addTagDiscoveredListener(
+          async (nfcEvent: any) => {
+            try {
+              const tag = nfcEvent.tag;
+              const tagId = nfc.bytesToHexString(tag.id);
+              const data = await analyzeNfcTag(`Decoded Tag ID: ${tagId}`);
+              setNfcData({ ...data, tagId });
+              setLoading(false);
+              // Remove listener after capture to prevent duplicate triggers
+              nfc.removeTagDiscoveredListener();
+            } catch (err) {
+              setError("Failed to analyze detected tag.");
+              setLoading(false);
+            }
+          },
+          () => console.log("Listening for NFC tags..."),
+          (err: any) => {
+            setError(`NFC Hardware Error: ${err}`);
+            setLoading(false);
+          }
+        );
+
+        // Timeout fallback for native if no tag is tapped
+        setTimeout(() => {
+          if (loading && view === 'nfc' && !nfcData) {
+            setError("Scan timed out. Ensure NFC is enabled and tag is close.");
+            setLoading(false);
+          }
+        }, 15000);
+
+      } catch (err) {
+        setError('NFC initialization failed.');
+        setLoading(false);
+      }
+    } else {
+      // Browser Simulation
+      try {
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        const data = await analyzeNfcTag();
+        setNfcData(data);
+      } catch (err) {
+        setError('Intelligence simulation failed.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -227,9 +281,9 @@ export default function App() {
            </button>
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-12 gap-4 sm:gap-6">
            <div className="col-span-12 lg:col-span-8">
-              <div className="bg-black aspect-video rounded-3xl border border-white/10 overflow-hidden relative group">
+              <div className="bg-black aspect-video sm:aspect-video rounded-2xl sm:rounded-3xl border border-white/10 overflow-hidden relative group">
                  <div className="absolute inset-0 z-0">
                     <video 
                       ref={videoRef} 
@@ -250,21 +304,21 @@ export default function App() {
                       </div>
 
                       {/* HUD Overlays */}
-                      <div className="absolute top-6 left-6 z-30 flex flex-col gap-1">
+                      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30 flex flex-col gap-1">
                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
-                            <span className="text-[10px] font-bold text-white uppercase tracking-widest">LIVE // REC</span>
+                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-red-600 rounded-full animate-pulse"></div>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-widest">LIVE // REC</span>
                          </div>
-                         <p className="text-[10px] font-mono text-white/60 uppercase">{selectedCameraDevice?.hostname || 'Unknown Device'}</p>
-                         <p className="text-[8px] font-mono text-white/40 uppercase">UID: {selectedCameraDevice?.mac || '00:00:00:00:00'}</p>
+                         <p className="text-[9px] sm:text-[10px] font-mono text-white/60 uppercase">{selectedCameraDevice?.hostname || 'Unknown Device'}</p>
+                         <p className="text-[7px] sm:text-[8px] font-mono text-white/40 uppercase truncate max-w-[100px] sm:max-w-none">UID: {selectedCameraDevice?.mac || '00:00:00:00:00'}</p>
                       </div>
 
-                      <div className="absolute top-6 right-6 z-30 text-right">
-                         <p className="text-[10px] font-mono text-white/60">IP: {selectedCameraDevice?.ip || '0.0.0.0'}</p>
-                         <p className="text-[10px] font-mono text-white/60 tracking-wider">ISO 1600 // 1/60s</p>
+                      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30 text-right">
+                         <p className="text-[9px] sm:text-[10px] font-mono text-white/60">IP: {selectedCameraDevice?.ip || '0.0.0.0'}</p>
+                         <p className="hidden sm:block text-[10px] font-mono text-white/60 tracking-wider">ISO 1600 // 1/60s</p>
                       </div>
 
-                      <div className="absolute bottom-6 left-6 right-6 z-30 flex justify-between items-end">
+                      <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 z-30 flex justify-between items-end">
                          <div className="flex items-center gap-4">
                             <div className="flex flex-col gap-1">
                                <span className="text-[8px] font-mono text-white/40 uppercase">Signal Strength</span>
@@ -377,50 +431,52 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden font-sans">
-      {/* Header */}
-      <header className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-[#111114] shrink-0">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('home')}>
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-            <Target className="w-5 h-5 text-white" />
+    <div className="flex flex-col h-screen overflow-hidden font-sans bg-brand-bg text-slate-300">
+      {/* Header - Fixed at top */}
+      <header className="h-14 sm:h-16 border-b border-white/10 flex items-center justify-between px-4 sm:px-6 bg-[#111114] shrink-0 z-50">
+        <div className="flex items-center gap-2 sm:gap-3 cursor-pointer" onClick={() => setView('home')}>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 rounded flex items-center justify-center">
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
-          <span className="font-bold tracking-tight text-white uppercase text-sm">TracePro Intelligence</span>
+          <span className="font-bold tracking-tight text-white uppercase text-xs sm:text-sm">TracePro</span>
         </div>
         
-        <div className="flex-1 max-w-xl px-10">
-          <form onSubmit={view === 'social' ? handleSocialSearch : handlePhoneSearch} className="relative flex items-center">
+        <div className="hidden sm:flex flex-1 max-w-xl px-4 lg:px-10">
+          <form onSubmit={view === 'social' ? handleSocialSearch : handlePhoneSearch} className="relative flex items-center w-full">
             <input 
               type="text" 
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
-              placeholder={view === 'social' ? "Enter Name, Handle, or Email..." : "Enter Phone Number..."}
-              className="w-full bg-black border border-white/20 rounded-md py-2 px-4 text-sm focus:outline-none focus:border-blue-500 font-mono text-white placeholder:text-slate-600"
+              placeholder={view === 'social' ? "Name, Handle, or Email..." : "Phone Number..."}
+              className="w-full bg-black border border-white/20 rounded-md py-1.5 px-4 text-xs focus:outline-none focus:border-blue-500 font-mono text-white placeholder:text-slate-600"
             />
             <button 
               type="submit" 
-              disabled={loading || view === 'network' || view === 'nfc'}
-              className="absolute right-2 bg-blue-600 text-white text-[10px] px-3 py-1 rounded font-bold hover:bg-blue-700 transition-colors"
+              disabled={loading}
+              className="absolute right-2 bg-blue-600 text-white text-[9px] px-2 py-1 rounded font-bold hover:bg-blue-700 transition-colors"
             >
-              {loading ? 'ANALYZING...' : 'SEARCH'}
+              SEARCH
             </button>
           </form>
         </div>
 
-        <div className="flex items-center gap-4 text-[10px] font-bold">
-          <span className="text-green-500 flex items-center gap-1">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div> SYSTEM ONLINE
+        <div className="flex items-center gap-3 text-[9px] font-bold">
+          <span className="text-green-500 hidden xs:flex items-center gap-1">
+            <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></div> ONLINE
           </span>
-          <div className="w-px h-4 bg-white/10"></div>
-          <span className="text-slate-500 uppercase">Latency: 42ms</span>
+          <div className="hidden xs:block w-px h-3 bg-white/10"></div>
+          <span className="text-slate-500 uppercase">L: 42ms</span>
         </div>
       </header>
 
       {/* Main Container */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 border-r border-white/10 bg-[#0F0F12] flex flex-col shrink-0">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Sidebar - Hidden on mobile */}
+        <aside className="hidden md:flex w-64 border-r border-white/10 bg-[#0F0F12] flex-col shrink-0 overflow-y-auto">
           <div className="p-4 border-b border-white/5 bg-white/5">
-            <h2 className="label-mono mb-3">Intelligence History</h2>
+            <h2 className="label-mono mb-3 uppercase flex items-center gap-2">
+              <History size={12} /> Access Logs
+            </h2>
             <div className="space-y-1">
               {history.length > 0 ? history.map((h, i) => (
                 <button 
@@ -429,63 +485,60 @@ export default function App() {
                   className="w-full p-2 rounded text-left hover:bg-white/5 group transition-colors"
                 >
                   <div className="text-blue-400 font-mono text-xs group-hover:text-blue-300">{h.formattedNumber}</div>
-                  <div className="text-[9px] text-slate-500 uppercase tracking-tighter">Result Found • {h.carrier}</div>
+                  <div className="text-[9px] text-slate-500 uppercase tracking-tighter truncate">{h.carrier} • {h.location}</div>
                 </button>
               )) : (
-                <div className="text-[10px] text-slate-600 italic p-2 text-center">No recent records</div>
+                <div className="text-[9px] text-slate-600 italic p-2 text-center">No cached records</div>
               )}
             </div>
           </div>
 
           <div className="p-4">
             <h2 className="label-mono mb-3">Core Modules</h2>
-            <nav className="space-y-1">
+            <nav className="space-y-0.5">
               <SidebarLink active={view === 'home' || view === 'report'} onClick={() => setView('home')} icon={<ShieldCheck size={14}/>} label="OSINT Lookup" />
               <SidebarLink active={view === 'social'} onClick={() => setView('social')} icon={<Share2 size={14}/>} label="Social Crawler" />
               <SidebarLink active={view === 'records'} onClick={() => setView('records')} icon={<UserSearch size={14}/>} label="Public Records" />
               <SidebarLink active={view === 'network'} onClick={startNetworkScan} icon={<Wifi size={14}/>} label="Network Scanner" />
-              <SidebarLink active={view === 'nfc'} onClick={startNfcScan} icon={<Rss size={14}/>} label="NFC/RFID Scanner" />
+              <SidebarLink active={view === 'nfc'} onClick={startNfcScan} icon={<Rss size={14}/>} label="RFID/NFC Scan" />
               <SidebarLink active={view === 'camera'} onClick={() => { setView('camera'); setCameraActive(false); }} icon={<Camera size={14}/>} label="Remote Visuals" />
-              <SidebarLink active={view === 'history'} onClick={() => setView('history')} icon={<History size={14}/>} label="Access Logs" />
             </nav>
-
-            <div className="mt-8 pt-8 border-t border-white/5">
-              <div className="intelligence-panel bg-blue-600/5 p-4 rounded-xl">
-                 <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                    <Activity size={10} /> Hardware Synchronized
-                 </h4>
-                 <div className="space-y-2">
-                    <div className="flex justify-between items-center text-[9px] font-mono">
-                       <span className="text-slate-400">NFC CHIPSET</span>
-                       <span className="text-green-500">READY</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[9px] font-mono">
-                       <span className="text-slate-400">SIGNAL_BUFFER</span>
-                       <span className="text-blue-400">ENCRYPTED</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[9px] font-mono">
-                       <span className="text-slate-400">LOCATION_API</span>
-                       <span className="text-green-500">ACTIVE</span>
-                    </div>
-                 </div>
-              </div>
-            </div>
           </div>
           
           <div className="mt-auto p-4 border-t border-white/10 bg-black/20">
-             <div className="bg-blue-600/10 border border-blue-500/20 rounded p-3">
-                <p className="text-[9px] uppercase font-bold text-blue-400 mb-1">Station metadata</p>
-                <div className="font-mono text-[9px] leading-relaxed text-blue-300/60">
+             <div className="bg-blue-600/5 border border-blue-500/10 rounded p-3">
+                <p className="text-[9px] uppercase font-bold text-blue-400/60 mb-1">Station metadata</p>
+                <div className="font-mono text-[8px] leading-relaxed text-blue-300/40">
                    ID: AIS-PRO-7712<br/>
                    LVL: L3 ACCESS<br/>
-                   ZONE: US-EAST-1
+                   GEO: {navigator.language}
                 </div>
              </div>
           </div>
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto bg-brand-bg relative scroll-smooth p-6">
+        <main className="flex-1 overflow-y-auto bg-brand-bg relative scroll-smooth p-4 sm:p-6 pb-24 md:pb-6">
+          {/* Mobile Search - Visible only on small screens */}
+          <div className="md:hidden mb-6">
+            <form onSubmit={view === 'social' ? handleSocialSearch : handlePhoneSearch} className="relative flex items-center w-full">
+              <input 
+                type="text" 
+                value={inputQuery}
+                onChange={(e) => setInputQuery(e.target.value)}
+                placeholder={view === 'social' ? "Name or handle..." : "Phone search..."}
+                className="w-full bg-black border border-white/20 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-blue-500 font-mono text-white placeholder:text-slate-600 shadow-lg"
+              />
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="absolute right-3 bg-blue-600 text-white text-[10px] px-3 py-1.5 rounded-lg font-bold uppercase"
+              >
+                {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Run'}
+              </button>
+            </form>
+          </div>
+
           <AnimatePresence mode="wait">
             {view === 'home' && renderWelcome()}
             {view === 'report' && renderPhoneReport()}
@@ -499,17 +552,26 @@ export default function App() {
         </main>
       </div>
 
-      {/* Footer */}
-      <footer className="h-8 border-t border-white/10 bg-[#0F0F12] flex items-center px-6 text-[9px] text-slate-500 gap-6 uppercase tracking-widest shrink-0">
-        <span>Kernel 2.4.1-Stable</span>
-        <span>SSL: Verified</span>
+      {/* Bottom Navigation - Only visible on mobile */}
+      <nav className="md:hidden h-16 border-t border-white/10 bg-[#0F0F12]/95 backdrop-blur-md flex items-center justify-around px-2 pb-safe shrink-0 z-50">
+        <MobileNavLink active={view === 'home' || view === 'report'} onClick={() => setView('home')} icon={<ShieldCheck size={18}/>} label="Scan" />
+        <MobileNavLink active={view === 'social'} onClick={() => setView('social')} icon={<Share2 size={18}/>} label="Social" />
+        <MobileNavLink active={view === 'network'} onClick={startNetworkScan} icon={<Wifi size={18}/>} label="Network" />
+        <MobileNavLink active={view === 'nfc'} onClick={startNfcScan} icon={<Rss size={18}/>} label="NFC" />
+        <MobileNavLink active={view === 'camera'} onClick={() => setView('camera')} icon={<Camera size={18}/>} label="Visuals" />
+      </nav>
+
+      {/* Footer - Hidden on mobile */}
+      <footer className="hidden md:flex h-8 border-t border-white/10 bg-[#0F0F12] items-center px-6 text-[9px] text-slate-500 gap-6 uppercase tracking-widest shrink-0">
+        <span>Station: TRACE-PRO</span>
+        <span>SSL: SECURE</span>
         <div className="flex-1"></div>
-        <span className="text-blue-600 select-none">© 2024 Trace Intelligence Systems</span>
+        <span className="text-blue-600/50">© 2024 TracePro</span>
       </footer>
     </div>
   );
 
-  function renderWelcome() {
+   function renderWelcome() {
     return (
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -1229,12 +1291,29 @@ function SidebarLink({ active, onClick, icon, label }: { active: boolean, onClic
   return (
     <button 
       onClick={onClick}
-      className={`w-full flex items-center gap-2 p-2 text-xs rounded transition-all ${
-        active ? 'bg-white/10 text-white font-bold' : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+        active ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/10' : 'text-slate-400 hover:bg-white/5 hover:text-white'
       }`}
     >
-      <span className={active ? 'text-blue-400' : ''}>{icon}</span>
-      <span className="uppercase tracking-widest text-[9px]">{label}</span>
+      {icon}
+      <span className="uppercase tracking-wider">{label}</span>
+      {active && <div className="ml-auto w-1 h-1 bg-white rounded-full"></div>}
+    </button>
+  );
+}
+
+function MobileNavLink({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 flex-1 transition-all ${
+        active ? 'text-blue-500' : 'text-slate-500'
+      }`}
+    >
+      <div className={`p-1.5 rounded-lg ${active ? 'bg-blue-500/10' : ''}`}>
+        {icon}
+      </div>
+      <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
     </button>
   );
 }
