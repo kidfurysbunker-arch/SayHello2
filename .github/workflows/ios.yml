@@ -56,11 +56,18 @@ jobs:
           echo "Adding fresh iOS platform..."
           npx cap add ios
           
-          # 2. Sync
+          # 2. Add NFC Permissions to Info.plist
+          echo "Adding NFC Permissions to Info.plist..."
+          PLIST="ios/App/App/Info.plist"
+          if [ -f "$PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'TracePro requires NFC access to scan RFID/NFC tags.'" "$PLIST" || true
+          fi
+
+          # 3. Sync
           echo "Syncing web assets to native..."
           npx cap sync ios
           
-          # 3. Check if build succeeded
+          # 4. Check if build succeeded
           if [ -d "ios/App/App.xcworkspace" ]; then
             echo "SUCCESS: ios/App/App.xcworkspace exists."
           else
@@ -74,12 +81,12 @@ jobs:
           xcodebuild -workspace ios/App/App.xcworkspace \
                      -scheme App \
                      -configuration Debug \
-                     -destination 'generic/platform=iOS' \
+                     -sdk iphoneos \
                      -archivePath App.xcarchive \
-                     archive \
                      CODE_SIGN_IDENTITY="" \
                      CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGNING_ALLOWED=NO
+                     CODE_SIGNING_ALLOWED=NO \
+                     clean archive
 
       - name: Export IPA
         run: |

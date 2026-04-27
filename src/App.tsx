@@ -881,70 +881,66 @@ export default function App() {
             <div className="intelligence-panel pb-2">
               <div className="panel-header flex justify-between items-center">
                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Network Command Center (ARP Discovery)</h3>
-                 <span className="text-[10px] font-mono text-slate-500">{networkDevices.length} TARGETS IDENTIFIED</span>
+                 <span className="text-[10px] font-mono text-slate-500">{networkDevices.length} TARGETS</span>
               </div>
-              <div className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-white/5 border-b border-white/5">
-                       <tr>
-                          <th className="px-6 py-3 label-mono">Device / Host</th>
-                          <th className="px-6 py-3 label-mono">Physical Address</th>
-                          <th className="px-6 py-3 label-mono">Network Identity</th>
-                          <th className="px-6 py-3 label-mono text-right">Command</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                       {networkDevices.map((dev, i) => (
-                         <tr key={i} className={`hover:bg-white/[0.02] transition-colors ${dev.status === 'blocked' ? 'opacity-50' : ''}`}>
-                            <td className="px-6 py-4">
-                               <div className="flex items-center gap-3">
-                                  <div className={`p-1.5 rounded ${dev.status === 'blocked' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
-                                     {dev.type === 'Mobile' ? <Smartphone size={14} className={dev.status === 'blocked' ? 'text-red-400' : 'text-blue-400'} /> : 
-                                      dev.type === 'Workstation' ? <Laptop size={14} className={dev.status === 'blocked' ? 'text-red-400' : 'text-blue-400'} /> :
-                                      <Cpu size={14} className={dev.status === 'blocked' ? 'text-red-400' : 'text-blue-400'} />}
-                                  </div>
-                                  <div>
-                                     <p className="text-white font-bold leading-none mb-1">{dev.hostname}</p>
-                                     <p className="text-[10px] text-slate-500 font-mono">{dev.vendor}</p>
-                                  </div>
-                               </div>
-                            </td>
-                            <td className="px-6 py-4 font-mono text-slate-400 text-[10px]">{dev.mac}</td>
-                            <td className="px-6 py-4">
-                               <p className="text-blue-300 font-mono">{dev.ip}</p>
-                               <div className="flex items-center gap-1 mt-1">
-                                  <div className="h-1 w-12 bg-slate-800 rounded-full overflow-hidden">
-                                     <div className="h-full bg-blue-500" style={{ width: `${dev.signalStrength}%` }}></div>
-                                  </div>
-                                  <span className="text-[8px] text-slate-600">-{100 - (dev.signalStrength || 0)} dBm</span>
-                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                               <div className="flex justify-end gap-2">
-                                 <button 
-                                   onClick={() => initiateCameraBreach(dev)}
-                                   className="px-3 py-1.5 rounded font-bold uppercase text-[9px] bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1"
-                                 >
-                                    <Camera size={10} /> ACCESS LENS
-                                 </button>
-                                 <button 
-                                   onClick={() => toggleDeviceStatus(dev.mac)}
-                                   className={`px-3 py-1.5 rounded font-bold uppercase text-[9px] transition-all flex items-center gap-2 ${
-                                     dev.status === 'blocked' 
-                                       ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]' 
-                                       : 'bg-white/5 text-slate-400 hover:bg-red-600/20 hover:text-red-400'
-                                   }`}
-                                 >
-                                    {dev.status === 'online' ? <Wifi size={10} /> : <WifiOff size={10} />}
-                                    {dev.status === 'online' ? 'KILL' : 'RESTORE'}
-                                  </button>
-                               </div>
-                            </td>
-                         </tr>
-                       ))}
-                    </tbody>
-                  </table>
+              <div className="p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   {networkDevices.map((dev, i) => (
+                     <motion.div 
+                        key={i} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className={`bg-black/40 border p-4 rounded-2xl flex flex-col gap-3 transition-colors ${dev.status === 'blocked' ? 'border-red-500/30 opacity-60' : 'border-white/5 hover:border-blue-500/30'}`}
+                     >
+                        <div className="flex justify-between items-start">
+                           <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-xl h-10 w-10 flex items-center justify-center ${dev.status === 'blocked' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
+                                 {dev.type === 'Mobile' ? <Smartphone size={18} className={dev.status === 'blocked' ? 'text-red-400' : 'text-blue-400'} /> : 
+                                  dev.type === 'Workstation' ? <Laptop size={18} className={dev.status === 'blocked' ? 'text-red-400' : 'text-blue-400'} /> :
+                                  <Cpu size={18} className={dev.status === 'blocked' ? 'text-red-400' : 'text-blue-400'} />}
+                              </div>
+                              <div>
+                                 <p className="text-white font-bold leading-none mb-1 text-sm">{dev.hostname}</p>
+                                 <p className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">{dev.vendor}</p>
+                              </div>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-blue-300 font-mono text-[10px] font-bold">{dev.ip}</p>
+                              <p className="text-[8px] text-slate-600 font-mono mt-0.5">{dev.mac}</p>
+                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-white/5 p-2 px-3 rounded-lg">
+                           <div className="flex-1">
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                 <div className="h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" style={{ width: `${dev.signalStrength}%` }}></div>
+                              </div>
+                           </div>
+                           <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap">-{100 - (dev.signalStrength || 0)} dBm</span>
+                        </div>
+
+                        <div className="flex gap-2">
+                           <button 
+                             onClick={() => initiateCameraBreach(dev)}
+                             className="flex-1 py-2 rounded-xl font-bold uppercase text-[9px] bg-blue-600 text-white shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                           >
+                              <Camera size={12} /> ACCESS
+                           </button>
+                           <button 
+                             onClick={() => toggleDeviceStatus(dev.mac)}
+                             className={`flex-1 py-2 rounded-xl font-bold uppercase text-[9px] transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                               dev.status === 'blocked' 
+                                 ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' 
+                                 : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                             }`}
+                           >
+                              {dev.status === 'online' ? <Wifi size={12} /> : <WifiOff size={12} />}
+                              {dev.status === 'online' ? 'KILL' : 'RESTORE'}
+                            </button>
+                        </div>
+                     </motion.div>
+                   ))}
                 </div>
               </div>
             </div>
