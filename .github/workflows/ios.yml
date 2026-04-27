@@ -18,27 +18,16 @@ jobs:
 
       - name: Prepare Project Files
         run: |
-          # 1. Unzip if needed
           if ls *.zip 1> /dev/null 2>&1; then
-            echo "Unzipping uploaded project..."
             unzip -o *.zip || true
             rm *.zip || true
           fi
-          
-          # 2. Find project root
           PKG_PATH=$(find . -name package.json -not -path "*/node_modules/*" | head -n 1)
           if [ -z "$PKG_PATH" ]; then
-            echo "Error: No package.json found."
-            ls -R
             exit 1
           fi
-          
           PKG_DIR=$(dirname "$PKG_PATH")
-          echo "Project detected in: $PKG_DIR"
-          
-          # 3. Move to root if nested
           if [ "$PKG_DIR" != "." ]; then
-            echo "Relocating files to root..."
             mv "$PKG_DIR"/* . || true
             mv "$PKG_DIR"/.[!.]* . || true
           fi
@@ -51,53 +40,19 @@ jobs:
 
       - name: Capacitor Setup
         run: |
-          # 1. Clean up and re-add
           rm -rf ios
-          echo "Adding fresh iOS platform..."
           npx cap add ios
-          
-          # 2. Add NFC Permissions and Entitlements
-          echo "Adding NFC Permissions and Entitlements..."
           PLIST="ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
             /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'TracePro requires NFC access to scan RFID/NFC tags.'" "$PLIST" || true
           fi
-
-          ENTITLEMENTS="ios/App/App/App.entitlements"
-          if [ ! -f "$ENTITLEMENTS" ]; then
-            echo '<?xml version="1.0" encoding="UTF-8"?>
-            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-            <plist version="1.0">
-            <dict>
-              <key>com.apple.developer.nfc.readersession.formats</key>
-              <array>
-                <string>NDEF</string>
-                <string>TAG</string>
-              </array>
-            </dict>
-            </plist>' > "$ENTITLEMENTS"
-          fi
-
-          # 3. Sync
-          echo "Syncing web assets to native..."
           npx cap sync ios
-          
-          # 4. Check if build succeeded
-          if [ -d "ios/App/App.xcworkspace" ]; then
-            echo "SUCCESS: ios/App/App.xcworkspace exists."
-          else
-            echo "ERROR: ios/App/App.xcworkspace was not created."
-            ls -R ios || echo "ios folder is missing"
-            exit 1
-          fi
+          cd ios/App && pod install --repo-update && cd ../..
 
       - name: Build Xcode Project
         run: |
-          echo "Listing Xcode project schemes..."
-          xcodebuild -list -workspace ios/App/App.xcworkspace
-          
-          echo "Starting xcodebuild archive..."
-          xcodebuild -workspace ios/App/App.xcworkspace \
+          xcodebuild archive \
+                     -workspace ios/App/App.xcworkspace \
                      -scheme App \
                      -configuration Debug \
                      -destination 'generic/platform=iOS' \
@@ -105,18 +60,20 @@ jobs:
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
+                     PROVISIONING_PROFILE_SPECIFIER="" \
                      AD_HOC_CODE_SIGNING_ALLOWED=YES \
                      ENABLE_USER_SCRIPT_SANDBOXING=NO \
                      COMPILER_INDEX_STORE_ENABLE=NO \
-                     IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-                     archive
+                     IPHONEOS_DEPLOYMENT_TARGET=14.0 \
+                     GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
+                     -allowProvisioningUpdates \
+                     -quiet
 
       - name: Export IPA
         run: |
           mkdir -p build/Payload
           APP_PATH=$(find App.xcarchive -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
-            echo "Error: .app file not found in archive!"
             exit 1
           fi
           cp -R "$APP_PATH" build/Payload
