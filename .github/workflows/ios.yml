@@ -56,11 +56,26 @@ jobs:
           echo "Adding fresh iOS platform..."
           npx cap add ios
           
-          # 2. Add NFC Permissions to Info.plist
-          echo "Adding NFC Permissions to Info.plist..."
+          # 2. Add NFC Permissions and Entitlements
+          echo "Adding NFC Permissions and Entitlements..."
           PLIST="ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
             /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'TracePro requires NFC access to scan RFID/NFC tags.'" "$PLIST" || true
+          fi
+
+          ENTITLEMENTS="ios/App/App/App.entitlements"
+          if [ ! -f "$ENTITLEMENTS" ]; then
+            echo '<?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+              <key>com.apple.developer.nfc.readersession.formats</key>
+              <array>
+                <string>NDEF</string>
+                <string>TAG</string>
+              </array>
+            </dict>
+            </plist>' > "$ENTITLEMENTS"
           fi
 
           # 3. Sync
@@ -81,11 +96,12 @@ jobs:
           xcodebuild -workspace ios/App/App.xcworkspace \
                      -scheme App \
                      -configuration Debug \
-                     -sdk iphoneos \
+                     -destination 'generic/platform=iOS' \
                      -archivePath App.xcarchive \
-                     CODE_SIGN_IDENTITY="" \
-                     CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGN_IDENTITY="" \
+                     AD_HOC_CODE_SIGNING_ALLOWED=YES \
                      clean archive
 
       - name: Export IPA

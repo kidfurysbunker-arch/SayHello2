@@ -625,127 +625,145 @@ export default function App() {
     if (!report) return null;
     return (
       <motion.div 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
-        className="grid grid-cols-12 gap-6 pb-12"
+        initial={{ opacity: 0, y: 10 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        className="px-2 sm:px-0 space-y-4 sm:space-y-6 pb-12"
       >
-        {/* Profile Info */}
-        <div className="col-span-12 lg:col-span-7 space-y-6">
-          <div className="intelligence-panel">
-            <div className="panel-header">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Identity Profile</h3>
-              <span className={`status-badge ${report.riskScore > 50 ? 'status-alert' : 'status-online'}`}>
-                RISK: {report.riskScore}%
-              </span>
-            </div>
-            <div className="p-6 grid grid-cols-2 gap-y-4 gap-x-8">
-              <div><label className="label-mono block mb-1">Target Number</label><p className="text-sm text-white font-medium font-mono">{report.formattedNumber}</p></div>
-              <div><label className="label-mono block mb-1">Provider</label><p className="text-sm text-white font-medium">{report.carrier}</p></div>
-              <div><label className="label-mono block mb-1">Location</label><p className="text-sm text-white font-medium">{report.location}, {report.country}</p></div>
-              <div><label className="label-mono block mb-1">Line Type</label><p className="text-sm text-blue-400 font-medium">{report.lineType}</p></div>
-              <div className="col-span-2 pt-2 border-t border-white/5">
-                <label className="label-mono block mb-2">Executive Summary</label>
-                <p className="text-xs italic text-slate-400 leading-relaxed">"{report.summary}"</p>
+        {/* Header Action Card */}
+        <div className="intelligence-panel p-4 sm:p-6 bg-gradient-to-br from-white/5 to-transparent">
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20 shrink-0">
+                    <Target size={24} className="text-white" />
+                 </div>
+                 <div>
+                    <h2 className="text-xl font-bold text-white tracking-tighter uppercase">{report.formattedNumber}</h2>
+                    <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest leading-none mt-1">
+                      {report.carrier} // {report.lineType}
+                    </p>
+                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="intelligence-panel">
-            <div className="panel-header">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Platform Linkages</h3>
-            </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-               {report.socialFootprint && report.socialFootprint.length > 0 ? (
-                 report.socialFootprint.map((s, i) => (
-                  <div key={i} className="bg-white/5 border border-white/10 p-3 rounded-lg group relative">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-blue-400 font-bold text-[10px] uppercase">{s.platform}</span>
-                        {s.isVerified && <ShieldCheck size={10} className="text-blue-500" />}
-                      </div>
-                      <a href={s.url} target="_blank" className="text-slate-500 hover:text-white transition-colors">
-                        <ExternalLink size={12} />
-                      </a>
-                    </div>
-                    <p className="text-white font-bold text-xs mb-1">@{s.username}</p>
-                    {s.bio && <p className="text-[9px] text-slate-500 line-clamp-2 italic mb-2 leading-tight">"{s.bio}"</p>}
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-auto pt-2 border-t border-white/5">
-                       {s.followers && <span className="text-[9px] text-slate-400 font-mono">Foll: {s.followers}</span>}
-                       {s.activityLevel && (
-                         <span className={`text-[9px] font-bold ${
-                           s.activityLevel === 'high' ? 'text-green-500' : s.activityLevel === 'medium' ? 'text-yellow-500' : 'text-slate-500'
-                         } uppercase`}>Act: {s.activityLevel}</span>
-                       )}
-                    </div>
-                  </div>
-                ))
-               ) : (
-                 <p className="text-[10px] text-slate-500 italic p-2 col-span-2">No direct linkages detected in this pass.</p>
-               )}
-            </div>
-          </div>
-
-          <div className="intelligence-panel">
-            <div className="panel-header">
-               <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Network Topology</h3>
-            </div>
-            <div className="p-6">
-               <div className="bg-black/40 p-4 border border-white/5 rounded-md mb-4 flex items-center justify-between">
-                  <div>
-                    <span className="label-mono block mb-1">Associated Node Info</span>
-                    <span className="data-mono text-lg">DYNAMIC-GATEWAY-IP</span>
-                  </div>
-                  <Cpu className="text-slate-700" size={24} />
-               </div>
-               <p className="text-[11px] text-slate-500 leading-relaxed font-mono">
-                  {report.technicalDetails.ipExplanation}
-               </p>
-            </div>
-          </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                 <button onClick={() => setView('home')} className="flex-1 sm:flex-none px-4 py-2.5 bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase rounded-xl hover:bg-white/10 transition-colors">
+                    Reset
+                 </button>
+                 <button className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white text-[10px] font-bold uppercase rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+                    Export
+                 </button>
+              </div>
+           </div>
         </div>
 
-        {/* Visualization area */}
-        <div className="col-span-12 lg:col-span-5 space-y-6">
-           <div className="intelligence-panel aspect-square relative group bg-black">
-              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px]"></div>
-              
-              {/* Radar Effect */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <div className="w-4/5 h-4/5 border border-blue-500/20 rounded-full flex items-center justify-center">
-                    <div className="w-3/5 h-3/5 border border-blue-500/40 rounded-full flex items-center justify-center">
-                       <div className="relative">
-                          <div className="w-4 h-4 bg-blue-500 rounded-full animate-ping absolute"></div>
-                          <div className="w-4 h-4 bg-blue-500 rounded-full relative z-10 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-                       </div>
+        <div className="grid grid-cols-12 gap-4 sm:gap-6">
+           {/* Detailed Intelligence */}
+           <div className="col-span-12 lg:col-span-7 space-y-4 sm:space-y-6">
+              <div className="intelligence-panel">
+                 <div className="panel-header border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Subscriber Core</h3>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${report.riskScore > 50 ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'}`}>
+                      RISK: {report.riskScore}%
+                    </span>
+                 </div>
+                 <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <DataBox label="Location" value={`${report.location}, ${report.country}`} />
+                    <DataBox label="Provider" value={report.carrier} />
+                    <DataBox label="Timezone" value={report.timeZone} />
+                    <DataBox label="Link State" value="ACTIVE" />
+                    <div className="col-span-1 sm:col-span-2 mt-2 pt-4 border-t border-white/5">
+                       <label className="label-mono block mb-2">Automated Insights</label>
+                       <p className="text-[11px] italic text-slate-400 leading-relaxed bg-black/20 p-3 rounded-lg border border-white/5">
+                          "{report.summary}"
+                       </p>
                     </div>
                  </div>
-                 {/* Scanning Line */}
-                 <motion.div 
-                   animate={{ rotate: 360 }}
-                   transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-                   className="absolute w-1/2 h-1 bg-gradient-to-r from-transparent to-blue-500/50 origin-left left-1/2 -top-1"
-                 />
               </div>
 
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
-                 <div className="flex justify-between items-end">
-                    <div>
-                       <span className="text-[10px] uppercase text-blue-400 font-bold block mb-1 underline decoration-blue-500/30">Location Overlay</span>
-                       <span className="text-xs text-white font-mono">{report.location} TRACE</span>
+              <div className="intelligence-panel overflow-hidden">
+                 <div className="panel-header bg-white/[0.02] border-b border-white/5">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400">Digital Footprint</h3>
+                 </div>
+                 <div className="p-3 sm:p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                       {report.socialFootprint && report.socialFootprint.length > 0 ? (
+                         report.socialFootprint.map((s, i) => (
+                           <div key={i} className="bg-white/[0.03] border border-white/5 p-4 rounded-xl hover:border-blue-500/30 transition-all group">
+                              <div className="flex justify-between items-start mb-3">
+                                 <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 bg-blue-500/10 rounded flex items-center justify-center">
+                                       <span className="text-blue-400 font-bold text-[8px] uppercase">{s.platform[0]}</span>
+                                    </div>
+                                    <span className="text-blue-300 font-bold text-[10px] uppercase tracking-wide">{s.platform}</span>
+                                    {s.isVerified && <ShieldCheck size={10} className="text-blue-500" />}
+                                 </div>
+                                 <a href={s.url} target="_blank" className="p-1 hover:bg-white/10 rounded-lg text-slate-500 hover:text-white transition-all">
+                                    <ExternalLink size={12} />
+                                 </a>
+                              </div>
+                              <p className="text-white font-bold text-xs mb-1 truncate">@{s.username}</p>
+                              {s.bio && <p className="text-[9px] text-slate-500 line-clamp-2 italic mb-2 leading-tight">"{s.bio}"</p>}
+                              <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5">
+                                 <span className="text-[9px] text-slate-500 font-mono">{s.followers || '0'} FOLL</span>
+                                 <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-500/5 text-blue-400 uppercase`}>{s.activityLevel}</span>
+                              </div>
+                           </div>
+                         ))
+                       ) : (
+                         <div className="col-span-full py-8 text-center bg-black/20 rounded-xl border border-dashed border-white/10">
+                            <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">No profiles identified</p>
+                         </div>
+                       )}
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono">PRECISION: HIGH</span>
                  </div>
               </div>
            </div>
 
-           <div className="bg-blue-900/10 border border-blue-500/20 rounded-lg p-5">
-              <h4 className="label-mono mb-3 text-blue-400">Metadata Dump</h4>
-              <pre className="text-[9px] font-mono leading-relaxed text-blue-300/60 whitespace-pre-wrap">
-                TZ: {report.timeZone}{"\n"}
-                CARRIER_ID: {report.technicalDetails.mcc || 'NULL'}{report.technicalDetails.mnc || 'NULL'}{"\n"}
-                QUERY_SIG: {Math.random().toString(36).substring(7).toUpperCase()}{"\n"}
-                TIMESTAMP: {new Date().toISOString()}
-              </pre>
+           {/* Sidecar Info */}
+           <div className="col-span-12 lg:col-span-5 space-y-4 sm:space-y-6">
+              <div className="intelligence-panel aspect-square relative group bg-black rounded-3xl overflow-hidden shadow-2xl">
+                 <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px]"></div>
+                 <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-4/5 h-4/5 border border-blue-500/10 rounded-full flex items-center justify-center">
+                       <div className="w-3/5 h-3/5 border border-blue-500/20 rounded-full flex items-center justify-center">
+                          <div className="relative">
+                             <div className="w-3 h-3 bg-blue-500 rounded-full animate-ping absolute"></div>
+                             <div className="w-3 h-3 bg-blue-500 rounded-full relative z-10 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+                          </div>
+                       </div>
+                    </div>
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+                      className="absolute w-1/2 h-0.5 bg-gradient-to-r from-transparent via-blue-500/30 to-blue-500/60 origin-left left-1/2"
+                    />
+                 </div>
+                 <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent">
+                    <div className="flex justify-between items-end">
+                       <div className="flex flex-col gap-1">
+                          <span className="text-[8px] uppercase text-blue-400 font-bold tracking-[0.2em] opacity-80">Geodetic Lock</span>
+                          <span className="text-[12px] text-white font-mono tracking-tighter truncate max-w-[180px]">{report.location}</span>
+                       </div>
+                       <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 2, repeat: Infinity }} className="text-[8px] text-blue-400 font-mono font-bold">
+                          SCANNING...
+                       </motion.div>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="intelligence-panel p-4 sm:p-5">
+                 <div className="flex items-center gap-3 mb-4">
+                    <Cpu size={16} className="text-blue-500" />
+                    <h4 className="text-[10px] font-bold text-white uppercase tracking-wider">Protocol Diagnostics</h4>
+                 </div>
+                 <div className="space-y-3">
+                    <div className="flex justify-between items-center p-2 bg-white/[0.02] border border-white/5 rounded-lg">
+                       <span className="text-[9px] text-slate-500 font-mono uppercase">Topology</span>
+                       <span className="text-[10px] text-blue-300 font-bold font-mono">AS{Math.floor(Math.random() * 90000)}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-mono px-1">
+                       {report.technicalDetails.ipExplanation}
+                    </p>
+                 </div>
+              </div>
            </div>
         </div>
       </motion.div>
