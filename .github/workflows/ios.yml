@@ -69,23 +69,29 @@ jobs:
           # Sync
           npx cap sync ios
 
-          # Patch Podfile safely by rewriting it with required settings
+          # Patch Podfile to raise deployment target and disable bitcode
           PODFILE="ios/App/Podfile"
-          echo "require_relative '../node_modules/@capacitor/ios/scripts/pods_helpers'" > "$PODFILE"
-          echo "platform :ios, '14.0'" >> "$PODFILE"
-          echo "use_frameworks!" >> "$PODFILE"
-          echo "target 'App' do" >> "$PODFILE"
-          echo "  capacitor_pods" >> "$PODFILE"
-          echo "end" >> "$PODFILE"
-          echo "post_install do |installer|" >> "$PODFILE"
-          echo "  assert_deployment_target!(installer)" >> "$PODFILE"
-          echo "  installer.pods_project.targets.each do |target|" >> "$PODFILE"
-          echo "    target.build_configurations.each do |config|" >> "$PODFILE"
-          echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'" >> "$PODFILE"
-          echo "      config.build_settings['ENABLE_BITCODE'] = 'NO'" >> "$PODFILE"
-          echo "    end" >> "$PODFILE"
-          echo "  end" >> "$PODFILE"
-          echo "end" >> "$PODFILE"
+          # Rewrite Podfile with correct relative path to node_modules
+          cat <<EOF > "$PODFILE"
+require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+
+platform :ios, '14.0'
+use_frameworks!
+
+target 'App' do
+  capacitor_pods
+end
+
+post_install do |installer|
+  assert_deployment_target!(installer)
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+    end
+  end
+end
+EOF
 
           cd ios/App && pod install --repo-update && cd ../..
 
