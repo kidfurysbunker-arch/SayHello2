@@ -1,0 +1,92 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare Project Files
+        run: |
+          # 1. Unzip if needed
+          if ls *.zip 1> /dev/null 2>&1; then
+            echo "Unzipping uploaded project..."
+            unzip -o *.zip || true
+            rm *.zip || true
+          fi
+          
+          # 2. Find project root
+          PKG_PATH=$(find . -name package.json -not -path "*/node_modules/*" | head -n 1)
+          if [ -z "$PKG_PATH" ]; then
+            echo "Error: No package.json found."
+            ls -R
+            exit 1
+          fi
+          
+          PKG_DIR=$(dirname "$PKG_PATH")
+          echo "Project detected in: $PKG_DIR"
+          
+          # 3. Move to root if nested
+          if [ "$PKG_DIR" != "." ]; then
+            echo "Relocating files to root..."
+            mv "$PKG_DIR"/* . || true
+            mv "$PKG_DIR"/.[!.]* . || true
+          fi
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Capacitor Setup
+        run: |
+          if [ ! -d "ios" ]; then
+            echo "Adding iOS platform..."
+            npx cap add ios
+          else
+            echo "iOS platform already found in repository."
+          fi
+          npx cap sync ios
+
+      - name: Debug iOS Structure
+        run: |
+          ls -R ios || echo "ios directory not found"
+
+      - name: Build Xcode Project
+        run: |
+          if [ ! -f "ios/App/App.xcworkspace" ]; then
+            echo "Error: ios/App/App.xcworkspace not found! Capacitor sync might have failed."
+            exit 1
+          fi
+          xcodebuild -workspace ios/App/App.xcworkspace \
+                     -scheme App \
+                     -configuration Debug \
+                     -destination 'generic/platform=iOS' \
+                     -archivePath App.xcarchive \
+                     archive \
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGNING_ALLOWED=NO
+
+      - name: Export IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R App.xcarchive/Products/Applications/App.app build/Payload
+          cd build && zip -r TracePro.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TracePro-iOS-IPA
+          path: build/TracePro.ipa

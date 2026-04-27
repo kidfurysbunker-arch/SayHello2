@@ -1,0 +1,9 @@
+{
+  "name": "TracePro Intelligence Suit",
+  "description": "Professional Grade OSINT and Signals Intelligence Dashboard. Optimized for deployment on mobile hardware for field operations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
