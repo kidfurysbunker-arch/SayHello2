@@ -93,6 +93,10 @@ jobs:
 
       - name: Build Xcode Project
         run: |
+          echo "Listing Xcode project schemes..."
+          xcodebuild -list -workspace ios/App/App.xcworkspace
+          
+          echo "Starting xcodebuild archive..."
           xcodebuild -workspace ios/App/App.xcworkspace \
                      -scheme App \
                      -configuration Debug \
@@ -102,7 +106,10 @@ jobs:
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
                      AD_HOC_CODE_SIGNING_ALLOWED=YES \
-                     clean archive
+                     ENABLE_USER_SCRIPT_SANDBOXING=NO \
+                     COMPILER_INDEX_STORE_ENABLE=NO \
+                     IPHONEOS_DEPLOYMENT_TARGET=13.0 \
+                     archive
 
       - name: Export IPA
         run: |
