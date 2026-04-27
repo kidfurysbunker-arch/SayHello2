@@ -40,11 +40,13 @@ jobs:
 
       - name: Capacitor Setup
         run: |
+          PROJECT_ROOT=$(pwd)
           rm -rf ios
           npx cap add ios
+          npx cap sync ios
           
-          # Add NFC Permissions to Info.plist
-          PLIST="ios/App/App/Info.plist"
+          # 1. Update Info.plist for NFC
+          PLIST="$PROJECT_ROOT/ios/App/App/Info.plist"
           if [ -f "$PLIST" ]; then
             /usr/libexec/PlistBuddy -c "Add :NFCReaderUsageDescription string 'TracePro requires NFC access to scan RFID/NFC tags.'" "$PLIST" || true
             /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats array" "$PLIST" || true
@@ -52,28 +54,27 @@ jobs:
             /usr/libexec/PlistBuddy -c "Add :com.apple.developer.nfc.readersession.formats:1 string TAG" "$PLIST" || true
           fi
 
-          # Create Entitlements
-          ENTITLEMENTS="ios/App/App/App.entitlements"
-          echo '<?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>com.apple.developer.nfc.readersession.formats</key>
-            <array>
-              <string>NDEF</string>
-              <string>TAG</string>
-            </array>
-          </dict>
-          </plist>' > "$ENTITLEMENTS"
+          # 2. Create Entitlements
+          ENTITLEMENTS="$PROJECT_ROOT/ios/App/App/App.entitlements"
+          cat <<'EOF' > "$ENTITLEMENTS"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.nfc.readersession.formats</key>
+	<array>
+		<string>NDEF</string>
+		<string>TAG</string>
+	</array>
+</dict>
+</plist>
+EOF
 
-          # Sync
-          npx cap sync ios
-
-          # Patch Podfile to raise deployment target and disable bitcode
-          PODFILE="ios/App/Podfile"
-          # Rewrite Podfile with correct relative path to node_modules
+          # 3. Patch Podfile (Absolute path for require and deployment target)
+          PODFILE="$PROJECT_ROOT/ios/App/Podfile"
+          HELPERS_PATH="$PROJECT_ROOT/node_modules/@capacitor/ios/scripts/pods_helpers.rb"
           cat <<EOF > "$PODFILE"
-require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+require '$HELPERS_PATH'
 
 platform :ios, '14.0'
 use_frameworks!
@@ -93,6 +94,7 @@ post_install do |installer|
 end
 EOF
 
+          # Clean install pods
           cd ios/App && pod install --repo-update && cd ../..
 
       - name: Build Xcode Project
@@ -108,8 +110,6 @@ EOF
                      CODE_SIGN_IDENTITY="" \
                      PROVISIONING_PROFILE_SPECIFIER="" \
                      AD_HOC_CODE_SIGNING_ALLOWED=YES \
-                     DEVELOPMENT_TEAM="" \
-                     CODE_SIGN_STYLE=Manual \
                      ENABLE_USER_SCRIPT_SANDBOXING=NO \
                      COMPILER_INDEX_STORE_ENABLE=NO \
                      IPHONEOS_DEPLOYMENT_TARGET=14.0 \
