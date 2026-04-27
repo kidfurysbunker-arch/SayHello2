@@ -69,28 +69,23 @@ jobs:
           # Sync
           npx cap sync ios
 
-          # Patch Podfile safely to avoid duplicate post_install hooks
+          # Patch Podfile safely by rewriting it with required settings
           PODFILE="ios/App/Podfile"
-          if grep -q "post_install do |installer|" "$PODFILE"; then
-            # Insert our logic into the existing post_install block
-            sed -i '' '/post_install do |installer|/a \
-    installer.pods_project.targets.each do |target| \
-      target.build_configurations.each do |config| \
-        config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "14.0" \
-        config.build_settings["ENABLE_BITCODE"] = "NO" \
-      end \
-    end' "$PODFILE"
-          else
-            # Create a new post_install block if one doesn't exist
-            echo "post_install do |installer|
-    installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-      end
-    end
-  end" >> "$PODFILE"
-          fi
+          echo "require_relative '../node_modules/@capacitor/ios/scripts/pods_helpers'" > "$PODFILE"
+          echo "platform :ios, '14.0'" >> "$PODFILE"
+          echo "use_frameworks!" >> "$PODFILE"
+          echo "target 'App' do" >> "$PODFILE"
+          echo "  capacitor_pods" >> "$PODFILE"
+          echo "end" >> "$PODFILE"
+          echo "post_install do |installer|" >> "$PODFILE"
+          echo "  assert_deployment_target!(installer)" >> "$PODFILE"
+          echo "  installer.pods_project.targets.each do |target|" >> "$PODFILE"
+          echo "    target.build_configurations.each do |config|" >> "$PODFILE"
+          echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'" >> "$PODFILE"
+          echo "      config.build_settings['ENABLE_BITCODE'] = 'NO'" >> "$PODFILE"
+          echo "    end" >> "$PODFILE"
+          echo "  end" >> "$PODFILE"
+          echo "end" >> "$PODFILE"
 
           cd ios/App && pod install --repo-update && cd ../..
 
